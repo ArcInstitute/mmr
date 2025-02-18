@@ -3,10 +3,12 @@ use std::{
     io::{BufWriter, Write},
     num::NonZeroI32,
     sync::Arc,
+    time::Instant,
 };
 
 use anyhow::{anyhow, bail, Result};
 use binseq::{BinseqRecord, RefRecord};
+use indicatif::{ProgressBar, ProgressDrawTarget, ProgressStyle};
 use minimap2::{Aligner, Built, Mapping};
 use paraseq::{fastx::Record, parallel::ProcessError};
 use parking_lot::Mutex;
@@ -27,16 +29,35 @@ pub struct ParallelAlignment {
 
     /// IO lock
     io_lock: Arc<Mutex<()>>,
+
+    /// Number of records processed (local/global)
+    local_n_processed: usize,
+    global_n_processed: Arc<Mutex<usize>>,
+
+    /// Start time
+    start_time: Instant,
+
+    /// Thread id (local)
+    tid: usize,
+
+    /// Progress bar
+    pbar: Arc<Mutex<ProgressBar>>,
 }
 impl ParallelAlignment {
     pub fn new(aligner: Aligner<Built>, output_path: Option<String>) -> Result<Self> {
         Self::initialize_output(output_path.as_ref())?;
+        let pbar = Self::initialize_pbar();
         Ok(Self {
             aligner: Arc::new(aligner),
             dbuf: Vec::new(),
             wbuf: Vec::new(),
             io_lock: Arc::new(Mutex::new(())),
+            local_n_processed: 0,
+            global_n_processed: Arc::new(Mutex::new(0)),
             output_path,
+            start_time: Instant::now(),
+            tid: 0,
+            pbar: Arc::new(Mutex::new(pbar)),
         })
     }
     pub fn initialize_output(output_path: Option<&String>) -> Result<()> {
@@ -46,6 +67,16 @@ impl ParallelAlignment {
         } else {
             Ok(())
         }
+    }
+    pub fn initialize_pbar() -> ProgressBar {
+        let pbar = ProgressBar::new_spinner();
+        pbar.set_style(
+            ProgressStyle::default_spinner()
+                .template("{spinner:.cyan} [{elapsed_precise}] {msg}")
+                .unwrap(),
+        );
+        pbar.set_draw_target(ProgressDrawTarget::stderr_with_hz(10));
+        pbar
     }
     fn decode_record(&mut self, record: RefRecord) -> Result<()> {
         self.dbuf.clear();
@@ -92,6 +123,37 @@ impl ParallelAlignment {
 
         Ok(())
     }
+    fn calculate_throughput(&self) -> f64 {
+        let elapsed = self.start_time.elapsed().as_secs_f64();
+        *self.global_n_processed.lock() as f64 / elapsed
+    }
+    fn update_statistics(&mut self) {
+        *self.global_n_processed.lock() += self.local_n_processed;
+        self.local_n_processed = 0;
+    }
+    fn update_pbar(&self) {
+        // only update progress bar on the main thread
+        if self.tid == 0 {
+            let pbar = self.pbar.lock();
+            let elapsed = self.start_time.elapsed().as_secs_f64();
+            let throughput = self.calculate_throughput();
+            let msg = format!("Elapsed: {elapsed:.2}s, Throughput: {throughput:.2} reads/s",);
+            pbar.set_message(msg);
+        }
+    }
+    pub fn finish_pbar(&self) {
+        let pbar = self.pbar.lock();
+        let elapsed = self.start_time.elapsed().as_secs_f64();
+        let throughput = self.calculate_throughput();
+        let msg = format!("Elapsed: {elapsed:.2}s, Throughput: {throughput:.2} reads/s",);
+        pbar.finish_with_message(msg);
+    }
+    pub fn start_time(&self) -> Instant {
+        self.start_time
+    }
+    pub fn num_records(&self) -> usize {
+        *self.global_n_processed.lock()
+    }
 }
 impl binseq::ParallelProcessor for ParallelAlignment {
     fn process_record(&mut self, record: RefRecord) -> Result<()> {
@@ -100,13 +162,20 @@ impl binseq::ParallelProcessor for ParallelAlignment {
             Ok(mapping) => mapping,
             Err(err) => bail!("Error mapping record: {}", err),
         };
+        self.local_n_processed += 1;
         self.write_local(mapping)?;
         Ok(())
     }
 
     fn on_batch_complete(&mut self) -> Result<()> {
         self.write_record_set()?;
+        self.update_statistics();
+        self.update_pbar();
         Ok(())
+    }
+
+    fn set_tid(&mut self, tid: usize) {
+        self.tid = tid;
     }
 }
 impl paraseq::parallel::ParallelProcessor for ParallelAlignment {
@@ -120,13 +189,20 @@ impl paraseq::parallel::ParallelProcessor for ParallelAlignment {
                 return Err(ProcessError::from(anyhow!("Error mapping record: {}", err)));
             }
         };
+        self.local_n_processed += 1;
         self.write_local(mapping)?;
         Ok(())
     }
 
     fn on_batch_complete(&mut self) -> paraseq::parallel::Result<()> {
         self.write_record_set()?;
+        self.update_statistics();
+        self.update_pbar();
         Ok(())
+    }
+
+    fn set_thread_id(&mut self, thread_id: usize) {
+        self.tid = thread_id;
     }
 }
 

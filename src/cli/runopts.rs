@@ -1,10 +1,12 @@
 use clap::Parser;
 
-#[derive(Parser, Clone, Copy)]
+#[derive(Parser, Clone)]
 #[clap(next_help_heading = "RUN OPTIONS")]
 pub struct RunOptions {
     #[clap(short = 'T', long, default_value = "1")]
     n_threads: usize,
+    #[clap(short = 'L', long)]
+    pub log_path: Option<String>,
 }
 impl RunOptions {
     pub fn n_threads(&self) -> usize {
