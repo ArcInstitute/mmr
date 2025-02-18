@@ -5,9 +5,10 @@ use std::{
     sync::Arc,
 };
 
-use anyhow::{bail, Result};
-use binseq::{BinseqRecord, ParallelProcessor, RefRecord};
+use anyhow::{anyhow, bail, Result};
+use binseq::{BinseqRecord, RefRecord};
 use minimap2::{Aligner, Built, Mapping};
+use paraseq::{fastx::Record, parallel::ProcessError};
 use parking_lot::Mutex;
 use serde::Serialize;
 
@@ -62,6 +63,19 @@ impl ParallelAlignment {
             Ok(Box::new(buffer))
         }
     }
+    fn write_local(&mut self, mapping: Vec<Mapping>) -> Result<()> {
+        let mut wtr = csv::WriterBuilder::new()
+            .has_headers(false)
+            .delimiter(b'\t')
+            .from_writer(&mut self.wbuf);
+
+        for alignment in mapping {
+            let mapping: MappingNutype = alignment.into();
+            wtr.serialize(mapping)?;
+        }
+        wtr.flush()?;
+        Ok(())
+    }
     fn write_record_set(&mut self) -> Result<()> {
         // Open a thread-safe stdout writer
         //
@@ -79,28 +93,38 @@ impl ParallelAlignment {
         Ok(())
     }
 }
-impl ParallelProcessor for ParallelAlignment {
+impl binseq::ParallelProcessor for ParallelAlignment {
     fn process_record(&mut self, record: RefRecord) -> Result<()> {
         self.decode_record(record)?;
         let mapping = match self.aligner.map(&self.dbuf, false, false, None, None, None) {
             Ok(mapping) => mapping,
             Err(err) => bail!("Error mapping record: {}", err),
         };
-
-        let mut wtr = csv::WriterBuilder::new()
-            .has_headers(false)
-            .delimiter(b'\t')
-            .from_writer(&mut self.wbuf);
-
-        for alignment in mapping {
-            let mapping: MappingNutype = alignment.into();
-            wtr.serialize(mapping)?;
-        }
-        wtr.flush()?;
+        self.write_local(mapping)?;
         Ok(())
     }
 
     fn on_batch_complete(&mut self) -> Result<()> {
+        self.write_record_set()?;
+        Ok(())
+    }
+}
+impl paraseq::parallel::ParallelProcessor for ParallelAlignment {
+    fn process_record<Rf: Record>(&mut self, record: Rf) -> paraseq::parallel::Result<()> {
+        let mapping = match self
+            .aligner
+            .map(record.seq(), false, false, None, None, None)
+        {
+            Ok(mapping) => mapping,
+            Err(err) => {
+                return Err(ProcessError::from(anyhow!("Error mapping record: {}", err)));
+            }
+        };
+        self.write_local(mapping)?;
+        Ok(())
+    }
+
+    fn on_batch_complete(&mut self) -> paraseq::parallel::Result<()> {
         self.write_record_set()?;
         Ok(())
     }
