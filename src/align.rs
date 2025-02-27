@@ -6,8 +6,8 @@ use std::{
     time::Instant,
 };
 
-use anyhow::{anyhow, bail, Result};
-use binseq::{BinseqRecord, RefRecord};
+use anyhow::{anyhow, Result};
+use binseq::RefRecord;
 use indicatif::{ProgressBar, ProgressDrawTarget, ProgressStyle};
 use minimap2::{Aligner, Built, Mapping};
 use paraseq::{fastx::Record, parallel::ProcessError};
@@ -80,7 +80,7 @@ impl ParallelAlignment {
     }
     fn decode_record(&mut self, record: RefRecord) -> Result<()> {
         self.dbuf.clear();
-        record.decode(&mut self.dbuf)?;
+        record.decode_s(&mut self.dbuf)?;
         Ok(())
     }
     fn reopen_handle(&self) -> Result<Box<dyn Write>> {
@@ -156,18 +156,18 @@ impl ParallelAlignment {
     }
 }
 impl binseq::ParallelProcessor for ParallelAlignment {
-    fn process_record(&mut self, record: RefRecord) -> Result<()> {
+    fn process_record(&mut self, record: RefRecord) -> Result<(), binseq::Error> {
         self.decode_record(record)?;
         let mapping = match self.aligner.map(&self.dbuf, false, false, None, None, None) {
             Ok(mapping) => mapping,
-            Err(err) => bail!("Error mapping record: {}", err),
+            Err(err) => return Err(anyhow!("Error mapping record: {}", err).into()),
         };
         self.local_n_processed += 1;
         self.write_local(mapping)?;
         Ok(())
     }
 
-    fn on_batch_complete(&mut self) -> Result<()> {
+    fn on_batch_complete(&mut self) -> Result<(), binseq::Error> {
         self.write_record_set()?;
         self.update_statistics();
         self.update_pbar();
