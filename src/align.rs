@@ -7,7 +7,6 @@ use std::{
 };
 
 use anyhow::{anyhow, Result};
-use binseq::RefRecord;
 use indicatif::{ProgressBar, ProgressDrawTarget, ProgressStyle};
 use minimap2::{Aligner, Built, Mapping};
 use paraseq::{fastx::Record, parallel::ProcessError};
@@ -78,7 +77,12 @@ impl ParallelAlignment {
         pbar.set_draw_target(ProgressDrawTarget::stderr_with_hz(10));
         pbar
     }
-    fn decode_record(&mut self, record: RefRecord) -> Result<()> {
+    fn decode_binseq_record(&mut self, record: binseq::RefRecord) -> Result<(), binseq::Error> {
+        self.dbuf.clear();
+        record.decode_s(&mut self.dbuf)?;
+        Ok(())
+    }
+    fn decode_vbinseq_record(&mut self, record: vbinseq::RefRecord) -> Result<(), vbinseq::Error> {
         self.dbuf.clear();
         record.decode_s(&mut self.dbuf)?;
         Ok(())
@@ -156,8 +160,8 @@ impl ParallelAlignment {
     }
 }
 impl binseq::ParallelProcessor for ParallelAlignment {
-    fn process_record(&mut self, record: RefRecord) -> Result<(), binseq::Error> {
-        self.decode_record(record)?;
+    fn process_record(&mut self, record: binseq::RefRecord) -> Result<(), binseq::Error> {
+        self.decode_binseq_record(record)?;
         let mapping = match self.aligner.map(&self.dbuf, false, false, None, None, None) {
             Ok(mapping) => mapping,
             Err(err) => return Err(anyhow!("Error mapping record: {}", err).into()),
@@ -168,6 +172,29 @@ impl binseq::ParallelProcessor for ParallelAlignment {
     }
 
     fn on_batch_complete(&mut self) -> Result<(), binseq::Error> {
+        self.write_record_set()?;
+        self.update_statistics();
+        self.update_pbar();
+        Ok(())
+    }
+
+    fn set_tid(&mut self, tid: usize) {
+        self.tid = tid;
+    }
+}
+impl vbinseq::ParallelProcessor for ParallelAlignment {
+    fn process_record(&mut self, record: vbinseq::RefRecord) -> Result<(), vbinseq::Error> {
+        self.decode_vbinseq_record(record)?;
+        let mapping = match self.aligner.map(&self.dbuf, false, false, None, None, None) {
+            Ok(mapping) => mapping,
+            Err(err) => return Err(anyhow!("Error mapping record: {}", err).into()),
+        };
+        self.local_n_processed += 1;
+        self.write_local(mapping)?;
+        Ok(())
+    }
+
+    fn on_batch_complete(&mut self) -> Result<(), vbinseq::Error> {
         self.write_record_set()?;
         self.update_statistics();
         self.update_pbar();
