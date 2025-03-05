@@ -1,6 +1,6 @@
 [package]
 name = "minimap-binseq"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 
 [[bin]]
@@ -13,6 +13,7 @@ minimap2 = { version = "0.1.23", default-features = false, features = [
     "simde",
 ] }
 binseq = { git = "ssh://github.com/noamteyssier/binseq" }
+vbinseq = { git = "ssh://github.com/noamteyssier/vbinseq" }
 serde = { version = "1.0.217", features = ["derive", "rc"] }
 csv = "1.3.1"
 parking_lot = "0.12.3"

@@ -2,7 +2,6 @@ use std::io::Write;
 use std::time::Instant;
 
 use anyhow::Result;
-use binseq::MmapReader;
 use clap::Parser;
 
 mod align;
@@ -57,7 +56,25 @@ fn process_binseq(
     start_time: Instant,
     log_path: Option<&str>,
 ) -> Result<()> {
-    let reader = MmapReader::new(query_path)?;
+    let reader = binseq::MmapReader::new(query_path)?;
+    reader.process_parallel(aligner.clone(), n_threads)?;
+    aligner.finish_pbar();
+    report_runtime(
+        start_time,
+        aligner.start_time(),
+        aligner.num_records(),
+        log_path,
+    )
+}
+
+fn process_vbinseq(
+    aligner: ParallelAlignment,
+    query_path: &str,
+    n_threads: usize,
+    start_time: Instant,
+    log_path: Option<&str>,
+) -> Result<()> {
+    let reader = vbinseq::MmapReader::new(query_path)?;
     reader.process_parallel(aligner.clone(), n_threads)?;
     aligner.finish_pbar();
     report_runtime(
@@ -83,6 +100,14 @@ fn main() -> Result<()> {
     let query_path = &args.io_options.query_path;
     if query_path.ends_with(".bq") {
         process_binseq(
+            aligner,
+            query_path,
+            args.run_options.n_threads(),
+            start_time,
+            args.run_options.log_path.as_deref(),
+        )
+    } else if query_path.ends_with(".vbq") {
+        process_vbinseq(
             aligner,
             query_path,
             args.run_options.n_threads(),
