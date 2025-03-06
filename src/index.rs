@@ -12,7 +12,7 @@ pub fn build_index(
     eprintln!("Building index...");
     let start = std::time::Instant::now();
     let aligner = Aligner::builder()
-        .preset(minimap2::Preset::Sr)
+        .preset(idx_options.preset.into())
         .with_index_threads(n_threads)
         .with_index(path, None);
     let duration = start.elapsed();
@@ -47,6 +47,7 @@ fn update_map_options(aligner: &mut Aligner<Built>, map_options: MappingOptions)
     aligner.mapopt.e2 = map_options.gap_ext.1;
     aligner.mapopt.zdrop = map_options.zdrop.0;
     aligner.mapopt.zdrop_inv = map_options.zdrop.1;
+    map_options.splice_mode.update_mapopt(&mut aligner.mapopt);
 }
 
 fn update_index_options(aligner: &mut Aligner<Built>, idx_options: IndexOptions) {

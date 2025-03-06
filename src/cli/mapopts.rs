@@ -1,4 +1,5 @@
-use clap::Parser;
+use clap::{Parser, ValueEnum};
+use minimap2::MapOpt;
 
 #[derive(Parser, Clone, Copy)]
 #[clap(next_help_heading = "MAPPING OPTIONS")]
@@ -14,7 +15,7 @@ pub struct MappingOptions {
     #[clap(
         short = 'g',
         long,
-        default_value = "5000",
+        default_value = "10000",
         help = "Stop chain elongation if there are no minimizers in INT-bp"
     )]
     pub max_gap: i32,
@@ -90,6 +91,14 @@ pub struct MappingOptions {
 
     #[clap(short = 'z', long, value_parser = parse_integer_tuple, default_value = "400,200", help = "Z-drop score and inversion Z-drop score")]
     pub zdrop: (i32, i32),
+
+    #[clap(
+        short = 'u',
+        long = "splice-mode",
+        default_value = "n",
+        help = "How to find canonical splicing sites GT-AG - f:transcript strand; b:both strands; r:reverse strand; n:don't match GT-AG"
+    )]
+    pub splice_mode: SpliceSiteMode,
 }
 
 fn parse_integer_tuple(s: &str) -> Result<(i32, i32), String> {
@@ -101,4 +110,47 @@ fn parse_integer_tuple(s: &str) -> Result<(i32, i32), String> {
         parts[0].parse::<i32>().map_err(|e| e.to_string())?,
         parts[1].parse::<i32>().map_err(|e| e.to_string())?,
     ))
+}
+
+/// How to find canonical splicing sites GT-AG
+#[derive(Clone, Copy, Debug, PartialEq, ValueEnum, Default)]
+pub enum SpliceSiteMode {
+    /// Don't attempt to match GT-AG (default)
+    #[clap(name = "n")]
+    #[default]
+    None,
+
+    /// Match GT-AG on the forward/transcript strand only
+    #[clap(name = "f")]
+    Forward,
+
+    /// Match GT-AG on both strands
+    #[clap(name = "b")]
+    Both,
+
+    /// Match CT-AC on the reverse strand (reverse complement of GT-AG)
+    #[clap(name = "r")]
+    Reverse,
+}
+impl SpliceSiteMode {
+    pub fn update_mapopt(&self, mapopt: &mut MapOpt) {
+        match self {
+            Self::None => {
+                mapopt.unset_splice_for();
+                mapopt.unset_splice_rev();
+            }
+            Self::Forward => {
+                mapopt.set_splice_for();
+                mapopt.unset_splice_rev();
+            }
+            Self::Both => {
+                mapopt.set_splice_for();
+                mapopt.set_splice_rev();
+            }
+            Self::Reverse => {
+                mapopt.unset_splice_for();
+                mapopt.set_splice_rev();
+            }
+        }
+    }
 }
