@@ -264,9 +264,9 @@ pub struct MappingNutype {
     pub match_len: i32,
     pub block_len: i32,
     pub mapq: u32,
-    pub is_primary: bool,
-    pub is_supplementary: bool,
-    pub alignment: &'static str,
+    // pub is_primary: bool,
+    // pub is_supplementary: bool,
+    // pub alignment: &'static str,
 }
 impl From<Mapping> for MappingNutype {
     fn from(mapping: Mapping) -> Self {
@@ -285,9 +285,9 @@ impl From<Mapping> for MappingNutype {
             match_len: mapping.match_len,
             block_len: mapping.block_len,
             mapq: mapping.mapq,
-            is_primary: mapping.is_primary,
-            is_supplementary: mapping.is_supplementary,
-            alignment: "*",
+            // is_primary: mapping.is_primary,
+            // is_supplementary: mapping.is_supplementary,
+            // alignment: "*",
         }
     }
 }
