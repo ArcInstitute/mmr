@@ -8,7 +8,7 @@ use std::{
 
 use anyhow::{anyhow, Result};
 use indicatif::{ProgressBar, ProgressDrawTarget, ProgressStyle};
-use minimap2::{Aligner, Built, Mapping};
+use minimap2::{Aligner, Built, Mapping, Strand};
 use paraseq::{fastx::Record, parallel::ProcessError};
 use parking_lot::Mutex;
 use serde::Serialize;
@@ -256,7 +256,7 @@ pub struct MappingNutype {
     pub query_len: Option<NonZeroI32>,
     pub query_start: i32,
     pub query_end: i32,
-    pub strand: u8,
+    pub strand: char,
     pub target_name: Option<Arc<String>>,
     pub target_len: i32,
     pub target_start: i32,
@@ -277,7 +277,10 @@ impl From<Mapping> for MappingNutype {
             query_len: mapping.query_len,
             query_start: mapping.query_start,
             query_end: mapping.query_end,
-            strand: mapping.strand as u8,
+            strand: match mapping.strand {
+                Strand::Forward => '+',
+                Strand::Reverse => '-',
+            },
             target_name: mapping.target_name,
             target_len: mapping.target_len,
             target_start: mapping.target_start,
