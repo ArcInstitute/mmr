@@ -161,8 +161,16 @@ impl ParallelAlignment {
 }
 impl binseq::ParallelProcessor for ParallelAlignment {
     fn process_record(&mut self, record: binseq::RefRecord) -> Result<(), binseq::Error> {
+        let query_name = format!("bq.{}", record.id());
         self.decode_binseq_record(record)?;
-        let mapping = match self.aligner.map(&self.dbuf, false, false, None, None, None) {
+        let mapping = match self.aligner.map(
+            &self.dbuf,
+            false,
+            false,
+            None,
+            None,
+            Some(query_name.as_bytes()),
+        ) {
             Ok(mapping) => mapping,
             Err(err) => return Err(anyhow!("Error mapping record: {}", err).into()),
         };
@@ -184,8 +192,16 @@ impl binseq::ParallelProcessor for ParallelAlignment {
 }
 impl vbinseq::ParallelProcessor for ParallelAlignment {
     fn process_record(&mut self, record: vbinseq::RefRecord) -> Result<(), vbinseq::Error> {
+        let query_name = format!("vbq.{}", record.index());
         self.decode_vbinseq_record(record)?;
-        let mapping = match self.aligner.map(&self.dbuf, false, false, None, None, None) {
+        let mapping = match self.aligner.map(
+            &self.dbuf,
+            false,
+            false,
+            None,
+            None,
+            Some(query_name.as_bytes()),
+        ) {
             Ok(mapping) => mapping,
             Err(err) => return Err(anyhow!("Error mapping record: {}", err).into()),
         };
@@ -207,15 +223,16 @@ impl vbinseq::ParallelProcessor for ParallelAlignment {
 }
 impl paraseq::parallel::ParallelProcessor for ParallelAlignment {
     fn process_record<Rf: Record>(&mut self, record: Rf) -> paraseq::parallel::Result<()> {
-        let mapping = match self
-            .aligner
-            .map(record.seq(), false, false, None, None, None)
-        {
-            Ok(mapping) => mapping,
-            Err(err) => {
-                return Err(ProcessError::from(anyhow!("Error mapping record: {}", err)));
-            }
-        };
+        let mapping =
+            match self
+                .aligner
+                .map(record.seq(), false, false, None, None, Some(record.id()))
+            {
+                Ok(mapping) => mapping,
+                Err(err) => {
+                    return Err(ProcessError::from(anyhow!("Error mapping record: {}", err)));
+                }
+            };
         self.local_n_processed += 1;
         self.write_local(mapping)?;
         Ok(())
@@ -235,7 +252,7 @@ impl paraseq::parallel::ParallelProcessor for ParallelAlignment {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct MappingNutype {
-    pub query_name: &'static str,
+    pub query_name: Arc<String>,
     pub query_len: Option<NonZeroI32>,
     pub query_start: i32,
     pub query_end: i32,
@@ -254,7 +271,9 @@ pub struct MappingNutype {
 impl From<Mapping> for MappingNutype {
     fn from(mapping: Mapping) -> Self {
         MappingNutype {
-            query_name: "*",
+            query_name: mapping
+                .query_name
+                .unwrap_or_else(|| Arc::new("*".to_string())),
             query_len: mapping.query_len,
             query_start: mapping.query_start,
             query_end: mapping.query_end,
