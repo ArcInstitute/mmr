@@ -94,6 +94,7 @@ fn main() -> Result<()> {
         args.mapping_options,
         args.index_options,
         args.run_options.n_threads(),
+        args.run_options.show_options,
     )?;
     let aligner = ParallelAlignment::new(index, args.io_options.output_path)?;
 

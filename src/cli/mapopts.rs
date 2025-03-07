@@ -7,100 +7,89 @@ pub struct MappingOptions {
     #[clap(
         short = 'f',
         long,
-        default_value = "0.0002",
-        help = "Filter out top FLOAT fraction of repetitive minimizers"
+        help = "Filter out top FLOAT fraction of repetitive minimizers [default = 0.0002]"
     )]
-    pub mask_level: f32,
+    pub mask_level: Option<f32>,
 
     #[clap(
         short = 'g',
         long,
-        default_value = "10000",
-        help = "Stop chain elongation if there are no minimizers in INT-bp"
+        help = "Stop chain elongation if there are no minimizers in INT-bp [default = 10000]"
     )]
-    pub max_gap: i32,
+    pub max_gap: Option<i32>,
 
     #[clap(
         short = 'G',
         long,
-        default_value = "200000",
-        help = "Max intron length (effective with -xsplice)"
+        help = "Max intron length (effective with -xsplice) [default = 200000]"
     )]
-    pub max_gap_ref: i32,
+    pub max_gap_ref: Option<i32>,
 
     #[clap(
         short = 'F',
         long,
-        default_value = "800",
-        help = "Max fragment length (effective with -xsr or in the fragment mode)"
+        help = "Max fragment length (effective with -xsr or in the fragment mode) [default = 800]"
     )]
-    pub max_frag_len: i32,
+    pub max_frag_len: Option<i32>,
 
-    #[clap(short = 'r', long, value_parser = parse_integer_tuple, default_value = "500,20000", help = "Chaining/alignment bandwidth and long-join bandwidth")]
-    pub bandwidth: (i32, i32),
+    #[clap(short = 'r', long, value_parser = parse_integer_tuple, help = "Chaining/alignment bandwidth and long-join bandwidth [default = 500,20000]")]
+    pub bandwidth: Option<(i32, i32)>,
 
     #[clap(
         short = 'n',
         long,
-        default_value = "3",
-        help = "Minimal number of minimizers on a chain"
+        help = "Minimal number of minimizers on a chain [default = 3]"
     )]
-    pub min_cnt: i32,
+    pub min_cnt: Option<i32>,
 
     #[clap(
         short = 'm',
         long,
-        default_value = "40",
-        help = "Minimal chaining score (matching bases minus log gap penalty)"
+        help = "Minimal chaining score (matching bases minus log gap penalty) [default = 40]"
     )]
-    pub min_chain_score: i32,
+    pub min_chain_score: Option<i32>,
 
     #[clap(
         short = 'p',
         long,
-        default_value = "0.8",
-        help = "Min secondary-to-primary score ratio"
+        help = "Min secondary-to-primary score ratio [default = 0.8]"
     )]
-    pub pri_ratio: f32,
+    pub pri_ratio: Option<f32>,
 
     #[clap(
         short = 'N',
         long,
-        default_value = "5",
-        help = "Retain at most INT secondary alignments"
+        help = "Retain at most INT secondary alignments [default = 5]"
     )]
-    pub best_n: i32,
+    pub best_n: Option<i32>,
 
     // Alignment scoring parameters
-    #[clap(short = 'A', long, default_value = "2", help = "Matching score")]
-    pub a: i32,
+    #[clap(short = 'A', long, help = "Matching score [default = 2]")]
+    pub a: Option<i32>,
 
     #[clap(
         short = 'B',
         long,
-        default_value = "4",
-        help = "Mismatch penalty (larger value for lower divergence)"
+        help = "Mismatch penalty (larger value for lower divergence) [default = 4]"
     )]
-    pub b: i32,
+    pub b: Option<i32>,
 
-    #[clap(short = 'O', long, value_parser = parse_integer_tuple, default_value = "4,24", help = "Gap open penalties. Format: INT,INT")]
-    pub gap_open: (i32, i32),
+    #[clap(short = 'O', long, value_parser = parse_integer_tuple, help = "Gap open penalties. Format: INT,INT [default = 4,24]")]
+    pub gap_open: Option<(i32, i32)>,
 
-    #[clap(short = 'E', long, value_parser = parse_integer_tuple, default_value = "2,1", help = "Gap extension penalties. Format: INT,INT")]
-    pub gap_ext: (i32, i32),
+    #[clap(short = 'E', long, value_parser = parse_integer_tuple, help = "Gap extension penalties. Format: INT,INT [default = 2,1]")]
+    pub gap_ext: Option<(i32, i32)>,
 
-    #[clap(short = 'z', long, value_parser = parse_integer_tuple, default_value = "400,200", help = "Z-drop score and inversion Z-drop score")]
-    pub zdrop: (i32, i32),
+    #[clap(short = 'z', long, value_parser = parse_integer_tuple, help = "Z-drop score and inversion Z-drop score [default = 400,200]")]
+    pub zdrop: Option<(i32, i32)>,
 
     #[clap(
         short = 'u',
         long = "splice-mode",
-        default_value = "n",
-        help = "How to find canonical splicing sites GT-AG - f:transcript strand; b:both strands; r:reverse strand; n:don't match GT-AG"
+        help = "How to find canonical splicing sites GT-AG - f:transcript strand; b:both strands; r:reverse strand; n:don't match GT-AG [default = n]"
     )]
-    pub splice_mode: SpliceSiteMode,
+    pub splice_mode: Option<SpliceSiteMode>,
 }
-
 fn parse_integer_tuple(s: &str) -> Result<(i32, i32), String> {
     let parts: Vec<&str> = s.split(',').collect();
     if parts.len() != 2 {

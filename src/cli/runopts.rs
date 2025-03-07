@@ -7,6 +7,9 @@ pub struct RunOptions {
     n_threads: usize,
     #[clap(short = 'L', long)]
     pub log_path: Option<String>,
+    /// Write the option configuration to stderr
+    #[clap(long)]
+    pub show_options: bool,
 }
 impl RunOptions {
     pub fn n_threads(&self) -> usize {
