@@ -1,11 +1,7 @@
 [package]
-name = "minimap-binseq"
+name = "mmr"
 version = "0.1.3"
 edition = "2021"
-
-[[bin]]
-name = "mmr"
-path = "src/main.rs"
 
 [features]
 default = []

@@ -16,7 +16,7 @@ const STYLES: Styles = Styles::styled()
 use super::{IndexOptions, IoOptions, MappingOptions, RunOptions};
 
 #[derive(Parser)]
-#[command(styles = STYLES)]
+#[command(styles = STYLES, version)]
 pub struct Cli {
     #[clap(flatten)]
     pub io_options: IoOptions,
