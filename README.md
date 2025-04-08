@@ -1,6 +1,6 @@
 # mmr
 
-A [minimap2](https://github.com/lh3/minimap2)-based aligner with [binseq](https://github.com/noamteyssier/binseq) and [vbinseq](https://github.com/noamteyssier/vbinseq) support.
+A [minimap2](https://github.com/lh3/minimap2)-based aligner with [binseq](https://github.com/arcinstitute/binseq) and [vbinseq](https://github.com/arcinstitute/vbinseq) support.
 
 ## Installation
 
