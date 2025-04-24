@@ -11,7 +11,7 @@ const STYLES: Styles = Styles::styled()
     .header(AnsiColor::Green.on_default().effects(Effects::BOLD))
     .usage(AnsiColor::Green.on_default().effects(Effects::BOLD))
     .literal(AnsiColor::Cyan.on_default().effects(Effects::BOLD))
-    .placeholder(AnsiColor::Cyan.on_default());
+    .placeholder(AnsiColor::Yellow.on_default());
 
 use super::{IndexOptions, IoOptions, MappingOptions, RunOptions};
 
