@@ -7,6 +7,7 @@ use std::{
 };
 
 use anyhow::{anyhow, Result};
+use binseq::BinseqRecord;
 use indicatif::{ProgressBar, ProgressDrawTarget, ProgressStyle};
 use minimap2::{Aligner, Built, Mapping, Strand};
 use paraseq::{fastx::Record, parallel::ProcessError};
@@ -77,16 +78,13 @@ impl ParallelAlignment {
         pbar.set_draw_target(ProgressDrawTarget::stderr_with_hz(10));
         pbar
     }
-    fn decode_binseq_record(&mut self, record: binseq::RefRecord) -> Result<(), binseq::Error> {
+
+    fn decode_record<B: BinseqRecord>(&mut self, record: B) -> Result<(), binseq::Error> {
         self.dbuf.clear();
         record.decode_s(&mut self.dbuf)?;
         Ok(())
     }
-    fn decode_vbinseq_record(&mut self, record: vbinseq::RefRecord) -> Result<(), vbinseq::Error> {
-        self.dbuf.clear();
-        record.decode_s(&mut self.dbuf)?;
-        Ok(())
-    }
+
     fn reopen_handle(&self) -> Result<Box<dyn Write>> {
         if let Some(path) = &self.output_path {
             let file = OpenOptions::new().append(true).open(path)?;
@@ -160,9 +158,9 @@ impl ParallelAlignment {
     }
 }
 impl binseq::ParallelProcessor for ParallelAlignment {
-    fn process_record(&mut self, record: binseq::RefRecord) -> Result<(), binseq::Error> {
-        let query_name = format!("bq.{}", record.id());
-        self.decode_binseq_record(record)?;
+    fn process_record<B: BinseqRecord>(&mut self, record: B) -> binseq::Result<()> {
+        let query_name = format!("bq.{}", record.index());
+        self.decode_record(record)?;
         let mapping = match self.aligner.map(
             &self.dbuf,
             false,
@@ -180,37 +178,6 @@ impl binseq::ParallelProcessor for ParallelAlignment {
     }
 
     fn on_batch_complete(&mut self) -> Result<(), binseq::Error> {
-        self.write_record_set()?;
-        self.update_statistics();
-        self.update_pbar();
-        Ok(())
-    }
-
-    fn set_tid(&mut self, tid: usize) {
-        self.tid = tid;
-    }
-}
-impl vbinseq::ParallelProcessor for ParallelAlignment {
-    fn process_record(&mut self, record: vbinseq::RefRecord) -> Result<(), vbinseq::Error> {
-        let query_name = format!("vbq.{}", record.index());
-        self.decode_vbinseq_record(record)?;
-        let mapping = match self.aligner.map(
-            &self.dbuf,
-            false,
-            false,
-            None,
-            None,
-            Some(query_name.as_bytes()),
-        ) {
-            Ok(mapping) => mapping,
-            Err(err) => return Err(anyhow!("Error mapping record: {}", err).into()),
-        };
-        self.local_n_processed += 1;
-        self.write_local(mapping)?;
-        Ok(())
-    }
-
-    fn on_batch_complete(&mut self) -> Result<(), vbinseq::Error> {
         self.write_record_set()?;
         self.update_statistics();
         self.update_pbar();
@@ -288,9 +255,6 @@ impl From<Mapping> for MappingNutype {
             match_len: mapping.match_len,
             block_len: mapping.block_len,
             mapq: mapping.mapq,
-            // is_primary: mapping.is_primary,
-            // is_supplementary: mapping.is_supplementary,
-            // alignment: "*",
         }
     }
 }

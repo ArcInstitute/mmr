@@ -26,8 +26,7 @@ niffler = "3.0.0"
 num_cpus = "1.16.0"
 indicatif = "0.17.11"
 serde_json = "1.0.138"
-binseq = "0.5.4"
-vbinseq = "0.1.5"
+binseq = "0.6.2"
 
 [profile.release]
 lto = true
