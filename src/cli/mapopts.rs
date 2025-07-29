@@ -4,6 +4,9 @@ use minimap2::MapOpt;
 #[derive(Parser, Clone, Copy)]
 #[clap(next_help_heading = "MAPPING OPTIONS")]
 pub struct MappingOptions {
+    #[clap(short = 'c', long, help = "Output CIGAR string")]
+    pub cigar: bool,
+
     #[clap(
         short = 'f',
         long,
