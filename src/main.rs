@@ -79,7 +79,11 @@ fn main() -> Result<()> {
         args.run_options.n_threads(),
         args.run_options.show_options,
     )?;
-    let aligner = ParallelAlignment::new(index, args.io_options.output_path)?;
+    let aligner = ParallelAlignment::new(
+        index,
+        args.io_options.output_path,
+        args.mapping_options.cigar,
+    )?;
 
     let query_path = &args.io_options.query_path;
     if query_path.ends_with(".bq") || query_path.ends_with(".vbq") {
