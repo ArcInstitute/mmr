@@ -30,6 +30,9 @@ pub struct ParallelAlignment {
     /// IO lock
     io_lock: Arc<Mutex<()>>,
 
+    /// Cigar option
+    with_cigar: bool,
+
     /// Number of records processed (local/global)
     local_n_processed: usize,
     global_n_processed: Arc<Mutex<usize>>,
@@ -44,7 +47,11 @@ pub struct ParallelAlignment {
     pbar: Arc<Mutex<ProgressBar>>,
 }
 impl ParallelAlignment {
-    pub fn new(aligner: Aligner<Built>, output_path: Option<String>) -> Result<Self> {
+    pub fn new(
+        aligner: Aligner<Built>,
+        output_path: Option<String>,
+        with_cigar: bool,
+    ) -> Result<Self> {
         Self::initialize_output(output_path.as_ref())?;
         let pbar = Self::initialize_pbar();
         Ok(Self {
@@ -58,6 +65,7 @@ impl ParallelAlignment {
             start_time: Instant::now(),
             tid: 0,
             pbar: Arc::new(Mutex::new(pbar)),
+            with_cigar,
         })
     }
     pub fn initialize_output(output_path: Option<&String>) -> Result<()> {
@@ -103,7 +111,7 @@ impl ParallelAlignment {
             .from_writer(&mut self.wbuf);
 
         for alignment in mapping {
-            let mapping: MappingNutype = alignment.into();
+            let mapping = MappingNutype::new(alignment, self.with_cigar);
             wtr.serialize(mapping)?;
         }
         wtr.flush()?;
@@ -163,7 +171,7 @@ impl binseq::ParallelProcessor for ParallelAlignment {
         self.decode_record(record)?;
         let mapping = match self.aligner.map(
             &self.dbuf,
-            false,
+            self.with_cigar,
             false,
             None,
             None,
@@ -231,13 +239,12 @@ pub struct MappingNutype {
     pub match_len: i32,
     pub block_len: i32,
     pub mapq: u32,
-    // pub is_primary: bool,
-    // pub is_supplementary: bool,
-    // pub alignment: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cigar: Option<String>,
 }
-impl From<Mapping> for MappingNutype {
-    fn from(mapping: Mapping) -> Self {
-        MappingNutype {
+impl MappingNutype {
+    fn new(mapping: Mapping, with_cigar: bool) -> Self {
+        Self {
             query_name: mapping
                 .query_name
                 .unwrap_or_else(|| Arc::new("*".to_string())),
@@ -255,6 +262,15 @@ impl From<Mapping> for MappingNutype {
             match_len: mapping.match_len,
             block_len: mapping.block_len,
             mapq: mapping.mapq,
+            cigar: if with_cigar {
+                if let Some(alignment) = mapping.alignment {
+                    alignment.cigar_str.map(|cigar| format!("cg:Z:{}M", cigar))
+                } else {
+                    Some(format!("cg:Z:{:?}M", mapping.query_len))
+                }
+            } else {
+                None
+            },
         }
     }
 }

@@ -38,6 +38,9 @@ pub fn build_index(
 }
 
 fn update_map_options(aligner: &mut Aligner<Built>, map_options: MappingOptions) {
+    if map_options.cigar {
+        aligner.mapopt.set_cigar();
+    }
     if let Some(mask_level) = map_options.mask_level {
         aligner.mapopt.mask_level = mask_level;
     }
