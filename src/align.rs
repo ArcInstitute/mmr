@@ -10,7 +10,7 @@ use anyhow::{anyhow, Result};
 use binseq::BinseqRecord;
 use indicatif::{ProgressBar, ProgressDrawTarget, ProgressStyle};
 use minimap2::{Aligner, Built, Mapping, Strand};
-use paraseq::{fastx::Record, parallel::ProcessError};
+use paraseq::{parallel::ProcessError, Record};
 use parking_lot::Mutex;
 use serde::Serialize;
 
@@ -201,7 +201,7 @@ impl paraseq::parallel::ParallelProcessor for ParallelAlignment {
         let mapping =
             match self
                 .aligner
-                .map(record.seq(), false, false, None, None, Some(record.id()))
+                .map(&record.seq(), false, false, None, None, Some(record.id()))
             {
                 Ok(mapping) => mapping,
                 Err(err) => {
