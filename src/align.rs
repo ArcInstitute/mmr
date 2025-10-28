@@ -10,7 +10,7 @@ use anyhow::{anyhow, Result};
 use binseq::BinseqRecord;
 use indicatif::{ProgressBar, ProgressDrawTarget, ProgressStyle};
 use minimap2::{Aligner, Built, Mapping, Strand};
-use paraseq::{parallel::ProcessError, Record};
+use paraseq::parallel::ProcessError;
 use parking_lot::Mutex;
 use serde::Serialize;
 
@@ -196,8 +196,8 @@ impl binseq::ParallelProcessor for ParallelAlignment {
         self.tid = tid;
     }
 }
-impl paraseq::parallel::ParallelProcessor for ParallelAlignment {
-    fn process_record<Rf: Record>(&mut self, record: Rf) -> paraseq::parallel::Result<()> {
+impl<Rf: paraseq::Record> paraseq::parallel::ParallelProcessor<Rf> for ParallelAlignment {
+    fn process_record(&mut self, record: Rf) -> paraseq::Result<()> {
         let mapping =
             match self
                 .aligner
@@ -213,7 +213,7 @@ impl paraseq::parallel::ParallelProcessor for ParallelAlignment {
         Ok(())
     }
 
-    fn on_batch_complete(&mut self) -> paraseq::parallel::Result<()> {
+    fn on_batch_complete(&mut self) -> paraseq::Result<()> {
         self.write_record_set()?;
         self.update_statistics();
         self.update_pbar();
