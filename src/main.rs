@@ -32,7 +32,7 @@ fn report_runtime(
 }
 
 fn process_fastq(
-    aligner: ParallelAlignment,
+    mut aligner: ParallelAlignment,
     query_path: &str,
     n_threads: usize,
     start_time: Instant,
@@ -40,7 +40,7 @@ fn process_fastq(
 ) -> Result<()> {
     let stream = transparent_reader(query_path)?;
     let reader = fastq::Reader::new(stream);
-    reader.process_parallel(aligner.clone(), n_threads)?;
+    reader.process_parallel(&mut aligner, n_threads)?;
     aligner.finish_pbar();
     report_runtime(
         start_time,
