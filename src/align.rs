@@ -10,16 +10,13 @@ use anyhow::{anyhow, Result};
 use binseq::BinseqRecord;
 use indicatif::{ProgressBar, ProgressDrawTarget, ProgressStyle};
 use minimap2::{Aligner, Built, Mapping, Strand};
-use paraseq::{parallel::ProcessError, Record};
+use paraseq::parallel::ProcessError;
 use parking_lot::Mutex;
 use serde::Serialize;
 
 #[derive(Clone)]
 pub struct ParallelAlignment {
     aligner: Arc<Aligner<Built>>,
-
-    /// Local buffer for decoding records
-    dbuf: Vec<u8>,
 
     /// Local write buffer for PAF records
     wbuf: Vec<u8>,
@@ -56,7 +53,6 @@ impl ParallelAlignment {
         let pbar = Self::initialize_pbar();
         Ok(Self {
             aligner: Arc::new(aligner),
-            dbuf: Vec::new(),
             wbuf: Vec::new(),
             io_lock: Arc::new(Mutex::new(())),
             local_n_processed: 0,
@@ -85,12 +81,6 @@ impl ParallelAlignment {
         );
         pbar.set_draw_target(ProgressDrawTarget::stderr_with_hz(10));
         pbar
-    }
-
-    fn decode_record<B: BinseqRecord>(&mut self, record: B) -> Result<(), binseq::Error> {
-        self.dbuf.clear();
-        record.decode_s(&mut self.dbuf)?;
-        Ok(())
     }
 
     fn reopen_handle(&self) -> Result<Box<dyn Write>> {
@@ -167,15 +157,13 @@ impl ParallelAlignment {
 }
 impl binseq::ParallelProcessor for ParallelAlignment {
     fn process_record<B: BinseqRecord>(&mut self, record: B) -> binseq::Result<()> {
-        let query_name = format!("bq.{}", record.index());
-        self.decode_record(record)?;
         let mapping = match self.aligner.map(
-            &self.dbuf,
+            record.sseq(),
             self.with_cigar,
             false,
             None,
             None,
-            Some(query_name.as_bytes()),
+            Some(record.sheader()),
         ) {
             Ok(mapping) => mapping,
             Err(err) => return Err(anyhow!("Error mapping record: {}", err).into()),
@@ -196,8 +184,8 @@ impl binseq::ParallelProcessor for ParallelAlignment {
         self.tid = tid;
     }
 }
-impl paraseq::parallel::ParallelProcessor for ParallelAlignment {
-    fn process_record<Rf: Record>(&mut self, record: Rf) -> paraseq::parallel::Result<()> {
+impl<Rf: paraseq::Record> paraseq::parallel::ParallelProcessor<Rf> for ParallelAlignment {
+    fn process_record(&mut self, record: Rf) -> paraseq::Result<()> {
         let mapping =
             match self
                 .aligner
@@ -213,7 +201,7 @@ impl paraseq::parallel::ParallelProcessor for ParallelAlignment {
         Ok(())
     }
 
-    fn on_batch_complete(&mut self) -> paraseq::parallel::Result<()> {
+    fn on_batch_complete(&mut self) -> paraseq::Result<()> {
         self.write_record_set()?;
         self.update_statistics();
         self.update_pbar();
